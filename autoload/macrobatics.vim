@@ -134,11 +134,13 @@ function! macrobatics#getGlobalNamedMacrosDir()
     return s:globalNamedMacrosSaveDirectory
 endfunction
 
-function! macrobatics#saveCurrentMacroToDirectory(dirPath)
-    call s:saveCurrentMacroToDirectory(resolve(expand(a:dirPath)))
+function! macrobatics#saveCurrentMacroToDirectory(dirPath, ...)
+    let skipParamPrompt = a:0 ? a:1 : 0
+    call s:saveCurrentMacroToDirectory(resolve(expand(a:dirPath)), skipParamPrompt)
 endfunction
 
-function! macrobatics#nameCurrentMacroForCurrentSession()
+function! macrobatics#nameCurrentMacroForCurrentSession(...)
+    let skipParamPrompt = a:0 ? a:1 : 0
     let name = input('Macro Name:')
     if len(name) == 0
         echo "Save macro cancelled"
@@ -155,7 +157,7 @@ function! macrobatics#nameCurrentMacroForCurrentSession()
             echo "Save macro cancelled"
             return
         endif
-        if has_key(s:namedMacroParamInfosForSession, name)
+        if !skipParamPrompt && has_key(s:namedMacroParamInfosForSession, name)
             let choice = confirm("Re-use previously saved parameter settings?", "&Yes\n&No", 2, "Question")
             if choice == 0
                 echo "Save macro cancelled"
@@ -167,15 +169,20 @@ function! macrobatics#nameCurrentMacroForCurrentSession()
         endif
     endif
     let s:namedMacrosForSession[name] = getreg(s:defaultMacroReg)
-    if overwriteParams
-        let s:namedMacroParamInfosForSession[name] = s:promptForParameterInfo()
+    if skipParamPrompt
+        let s:namedMacroParamInfosForSession[name] = []
+    else
+        if overwriteParams
+            let s:namedMacroParamInfosForSession[name] = s:promptForParameterInfo()
+        endif
     endif
     call s:echo("Saved macro with name '%s'", name)
 endfunction
 
-function! macrobatics#nameCurrentMacroForFileType()
+function! macrobatics#nameCurrentMacroForFileType(...)
+    let skipParamPrompt = a:0 ? a:1 : 0
     let saveDir = s:getFileTypeNamedMacrosDirs()[0]
-    call s:saveCurrentMacroToDirectory(saveDir)
+    call s:saveCurrentMacroToDirectory(saveDir, skipParamPrompt)
 endfunction
 
 function! macrobatics#renameNamedMacro(macroName)
@@ -297,8 +304,9 @@ function! macrobatics#searchAndOverwriteNamedMacro()
     call s:chooseNamedMacro({choice -> macrobatics#overwriteNamedMacro(choice)})
 endfunction
 
-function! macrobatics#nameCurrentMacro()
-    call s:saveCurrentMacroToDirectory(macrobatics#getGlobalNamedMacrosDir())
+function! macrobatics#nameCurrentMacro(...)
+    let skipParamPrompt = a:0 ? a:1 : 0
+    call s:saveCurrentMacroToDirectory(macrobatics#getGlobalNamedMacrosDir(), skipParamPrompt)
 endfunction
 
 function! s:makeChoice(values, sink)
@@ -637,9 +645,13 @@ function! macrobatics#play(reg, cnt)
     " Also note that using `normal! @` instead of feedkeys
     " Doesn't work sometimes
     call feedkeys(playInfo.cnt . "@" . playInfo.reg, 'ni')
-    " Don't need to use i here though, because we only want this to run at the very end
-    " Since otherwise it will overwrite s:repeatMacro
-    call feedkeys("\<plug>(Mac__OnPlayMacroCompleted)", 'm')
+    let s:macrosInProgress -= 1
+endfunction
+
+function! GetLastCharacterInRegisterN(reg)
+  let reg_contents = getreg(a:reg)
+  let last_char = reg_contents[-1:]
+  return last_char
 endfunction
 
 function! s:assert(value, ...)
@@ -859,7 +871,7 @@ function! s:promptForParameterInfo()
     return result
 endfunction
 
-function! s:saveCurrentMacroToDirectory(dirPath)
+function! s:saveCurrentMacroToDirectory(dirPath, skipParamPrompt)
     let name = input('Macro Name:')
     if len(name) == 0
         echo "Save macro cancelled"
@@ -881,7 +893,7 @@ function! s:saveCurrentMacroToDirectory(dirPath)
             echo "Save macro cancelled"
             return
         endif
-        if filereadable(paramFilePath)
+        if !a:skipParamPrompt && filereadable(paramFilePath)
             let choice = confirm("Re-use previously saved parameter settings?", "&Yes\n&No", 2, "Question")
             if choice == 0
                 echo "Save macro cancelled"
@@ -894,8 +906,12 @@ function! s:saveCurrentMacroToDirectory(dirPath)
     endif
     let macroData = getreg(s:defaultMacroReg)
     call s:saveMacroFile(macroData, dataFilePath)
-    if overwriteParamFile
-        call s:saveMacroParameterFile(s:promptForParameterInfo(), paramFilePath)
+    if a:skipParamPrompt
+        call delete(paramFilePath)
+    else
+        if overwriteParamFile
+            call s:saveMacroParameterFile(s:promptForParameterInfo(), paramFilePath)
+        endif
     endif
     call s:echo("Saved macro with name '%s'", name)
 endfunction
