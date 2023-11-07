@@ -645,10 +645,13 @@ function! macrobatics#play(reg, cnt)
     " Also note that using `normal! @` instead of feedkeys
     " Doesn't work sometimes
     call feedkeys(playInfo.cnt . "@" . playInfo.reg, 'ni')
-    " Don't need to use i here though, because we only want this to run at the very end
-    " Since otherwise it will overwrite s:repeatMacro
-    call feedkeys("\<plug>(Mac__OnPlayMacroCompleted)", 'm')
     let s:macrosInProgress -= 1
+endfunction
+
+function! GetLastCharacterInRegisterN(reg)
+  let reg_contents = getreg(a:reg)
+  let last_char = reg_contents[-1:]
+  return last_char
 endfunction
 
 function! s:assert(value, ...)
