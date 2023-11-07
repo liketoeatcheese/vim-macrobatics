@@ -641,11 +641,34 @@ function! macrobatics#play(reg, cnt)
 
     let s:macrosInProgress += 1
 
-    " We need to use 'i' to allow nested macros to work
-    " Also note that using `normal! @` instead of feedkeys
-    " Doesn't work sometimes
-    call feedkeys(playInfo.cnt . "@" . playInfo.reg, 'ni')
-    let s:macrosInProgress -= 1
+   let content = getreg(playInfo.reg)
+
+    " Check if the content is not empty
+    if len(content) > 0
+      " Get the last character of the content
+      let last_char = content[-1:]
+      " Check if the last character is 'i'
+      if last_char == 'i'
+        silent! call repeat#set("\<plug>(Mac__RepeatLast)")
+        " Force disable the logic in vim-repeat that waits for CursorMove
+        " This cause a bug where if you make a change immediately after recording a macro
+        " and then attempt to repeat that change it will repeat the macro instead
+        " Not sure why this logic is necessary in vim-repeat
+        augroup repeat_custom_motion
+            autocmd!
+        augroup END
+        let s:macrosInProgress -= 1
+        call feedkeys(playInfo.cnt . "@" . playInfo.reg, 'ni')
+      else
+        " We need to use 'i' to allow nested macros to work
+        " Also note that using `normal! @` instead of feedkeys
+        " Doesn't work sometimes
+        call feedkeys(playInfo.cnt . "@" . playInfo.reg, 'ni')
+        call feedkeys("\<plug>(Mac__OnPlayMacroCompleted)", 'm')
+      endif
+    else
+      echo "Register " . playInfo.reg . " is empty."
+    endif
 endfunction
 
 function! GetLastCharacterInRegisterN(reg)
